@@ -1,0 +1,22 @@
+{
+	"schemaVersion": 1,
+	"id": "mytp",
+	"version": "${version}",
+	"name": "MyTP",
+	"description": "自定义限距 TP 指令：以玩家自身为中心、最大传送半径 1000 格，超出则返回提示文本。服务端强制执行，客户端可正常安装。",
+	"authors": [],
+	"contact": {},
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.mytp.MyTpMod"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"fabric-api": "*",
+		"minecraft": "~26.2",
+		"java": ">=25"
+	}
+}

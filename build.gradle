@@ -1,0 +1,78 @@
+plugins {
+	id 'fabric-loom' version '1.17.20'
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	// 本 MOD 不依赖第三方模组库，无需额外仓库
+}
+
+loom {
+	// Minecraft 26.2 起游戏 jar 直接以 Mojang 官方命名发布（无混淆、无独立映射文件），
+	// 也不需要 intermediate 重映射，因此声明 noIntermediateMappings 且不声明 mappings 依赖。
+	noIntermediateMappings()
+}
+
+dependencies {
+	// 版本号统一在 gradle.properties 里维护
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	// 26.2 游戏 jar 已直接以 Mojang 官方命名发布（1.21.11 起不再混淆），
+	// Mojang 不再提供独立映射文件，因此使用从游戏 jar 生成的恒等映射。
+	mappings files("identity-26.2.jar")
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API（指令注册 fabric-command-api-v2 依赖它）
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+	inputs.property "version", project.version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": project.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	// Minecraft 26.2 要求 Java 25
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	inputs.property "archivesName", project.base.archivesName
+
+	from("LICENSE") {
+		rename { "${it}_${inputs.properties.archivesName}" }
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			artifactId = project.archives_base_name
+			from components.java
+		}
+	}
+	repositories {
+		// 本地构建无需发布到远程仓库
+	}
+}
+
+// 26.2 的 Minecraft jar 已直接以官方命名发布，没有 intermediary 中间命名空间，
+// 源码 jar 无需也无法做 named→intermediary 重映射，直接禁用。
+tasks.named("remapSourcesJar") {
+	enabled = false
+}

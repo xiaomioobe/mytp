@@ -1,0 +1,16 @@
+﻿# Gradle / 构建产物
+build/
+.gradle/
+*.class
+
+# 本地工具链（含 140MB 的 Gradle 发行版，勿提交）
+.build-tools/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+bin/
