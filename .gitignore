@@ -14,3 +14,7 @@ build/
 .classpath
 .project
 bin/
+
+# 临时图片（模组展示图等，不提交到代码仓库）
+mod-banner.png
+*.webp
