@@ -3,7 +3,7 @@
 	"id": "mytp",
 	"version": "${version}",
 	"name": "MyTP",
-	"description": "自定义 TP 指令 /mytp：支持坐标传送、公屏广播坐标消息、可配置范围限制与消息可见范围（全体/管理员）。服务端强制执行，客户端可正常安装。",
+	"description": "自定义 TP 指令 /mytp：支持坐标传送、1分钟最多10次频率限制、公屏广播坐标消息、可配置消息可见范围（全体/管理员）。服务端强制执行，客户端可正常安装。",
 	"authors": [],
 	"contact": {},
 	"license": "MIT",

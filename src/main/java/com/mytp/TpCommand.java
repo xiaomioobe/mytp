@@ -1,6 +1,5 @@
 package com.mytp;
 
-import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -12,25 +11,37 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.NameAndId;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * MyTP 指令注册与执行。
  * <p>
  * 指令结构：
  * <pre>
- * /mytp &lt;x&gt; &lt;y&gt; &lt;z&gt;              传送到指定坐标（支持 ~ 相对坐标）
- * /mytp config                       查看当前配置（仅 OP）
- * /mytp config limit &lt;true|false&gt;   开关传送范围限制（仅 OP）
- * /mytp config range &lt;数值&gt;          设置最大传送半径（仅 OP）
- * /mytp config message &lt;on|off&gt;      开关 TP 坐标消息（仅 OP）
- * /mytp config message visibility &lt;all|admin&gt;  设置消息可见范围（仅 OP）
+ * /mytp &lt;x&gt; &lt;y&gt; &lt;z&gt;                          传送到指定坐标（支持 ~ 相对坐标）
+ * /mytp config                                   查看当前配置（仅 OP）
+ * /mytp config message &lt;on|off&gt;                  开关 TP 坐标消息（仅 OP）
+ * /mytp config message visibility &lt;all|admin&gt;    设置消息可见范围（仅 OP）
  * </pre>
  * <p>
- * 默认行为：不限制传送距离；传送后向公屏广播坐标消息（全体可见）。
+ * 频率限制：每个玩家 1 分钟内最多 TP 10 次，超出则拒绝并在聊天栏提示。
  * 所有校验与广播均在服务端执行，客户端无法绕过。
  */
 public class TpCommand {
+
+    /** 频率限制：时间窗口（毫秒），1 分钟 */
+    private static final long TIME_WINDOW_MS = 60_000L;
+
+    /** 频率限制：时间窗口内最大 TP 次数 */
+    private static final int MAX_TP_PER_WINDOW = 10;
+
+    /** 每个玩家的 TP 时间戳队列（key: 玩家 UUID） */
+    private static final Map<UUID, Deque<Long>> tpTimestamps = new HashMap<>();
 
     private static ModConfig config;
 
@@ -60,14 +71,6 @@ public class TpCommand {
                 .then(Commands.literal("config")
                     .requires(TpCommand::isOp)
                     .executes(TpCommand::showConfig)
-                    // 范围限制开关
-                    .then(Commands.literal("limit")
-                        .then(Commands.literal("true").executes(ctx -> setLimit(ctx, true)))
-                        .then(Commands.literal("false").executes(ctx -> setLimit(ctx, false))))
-                    // 最大距离
-                    .then(Commands.literal("range")
-                        .then(Commands.argument("distance", DoubleArgumentType.doubleArg(0.0))
-                            .executes(TpCommand::setRange)))
                     // 消息开关 + 可见范围
                     .then(Commands.literal("message")
                         .then(Commands.literal("on").executes(ctx -> setMessage(ctx, true)))
@@ -79,25 +82,31 @@ public class TpCommand {
     }
 
     /**
-     * 执行传送：解析坐标 → 可选范围校验 → 传送 → 可选广播。
+     * 执行传送：频率校验 → 解析坐标 → 记录时间戳 → 传送 → 可选广播。
      */
     private static int execute(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         CommandSourceStack source = context.getSource();
         ServerPlayer player = source.getPlayerOrException();
+        UUID uuid = player.getUUID();
+
+        // 频率限制检查：1 分钟内最多 10 次
+        long now = System.currentTimeMillis();
+        Deque<Long> timestamps = tpTimestamps.computeIfAbsent(uuid, k -> new ArrayDeque<>());
+        // 清理超过 1 分钟的旧记录
+        while (!timestamps.isEmpty() && now - timestamps.peekFirst() > TIME_WINDOW_MS) {
+            timestamps.pollFirst();
+        }
+        if (timestamps.size() >= MAX_TP_PER_WINDOW) {
+            player.sendSystemMessage(Component.literal(
+                "您 TP 过于频繁，1 分钟内最多 10 次，请稍后再试"));
+            return 0;
+        }
 
         // 解析目标坐标（支持 ~ 相对坐标，返回绝对坐标 Vec3）
         Vec3 target = Vec3Argument.getVec3(context, "pos");
-        Vec3 current = player.position();
 
-        // 范围限制：仅当配置启用时才校验
-        if (config.limitEnabled) {
-            double distance = current.distanceTo(target);
-            if (distance > config.maxDistance) {
-                player.sendSystemMessage(Component.literal(
-                    "您当前 TP 已超出最大值，请在 " + (long) config.maxDistance + " 格内进行 TP"));
-                return 0;
-            }
-        }
+        // 记录本次 TP 时间
+        timestamps.addLast(now);
 
         // 执行传送（保持原有朝向）
         player.teleportTo(target.x, target.y, target.z);
@@ -136,29 +145,10 @@ public class TpCommand {
 
     private static int showConfig(CommandContext<CommandSourceStack> context) {
         String info = String.format(
-            "[MyTP] 当前配置：范围限制=%s，最大距离=%.0f格，TP消息=%s，可见范围=%s",
-            config.limitEnabled ? "开启" : "关闭",
-            config.maxDistance,
+            "[MyTP] 当前配置：TP消息=%s，可见范围=%s，频率限制=1分钟10次",
             config.messageEnabled ? "显示" : "关闭",
             "admin".equals(config.messageVisibility) ? "管理员可见" : "全体可见");
         context.getSource().sendSuccess(() -> Component.literal(info), false);
-        return 1;
-    }
-
-    private static int setLimit(CommandContext<CommandSourceStack> context, boolean value) {
-        config.limitEnabled = value;
-        config.save();
-        context.getSource().sendSuccess(() -> Component.literal(
-            "[MyTP] 传送范围限制已" + (value ? "开启" : "关闭")), false);
-        return 1;
-    }
-
-    private static int setRange(CommandContext<CommandSourceStack> context) {
-        double distance = DoubleArgumentType.getDouble(context, "distance");
-        config.maxDistance = distance;
-        config.save();
-        context.getSource().sendSuccess(() -> Component.literal(
-            "[MyTP] 最大传送距离已设为 " + (long) distance + " 格"), false);
         return 1;
     }
 

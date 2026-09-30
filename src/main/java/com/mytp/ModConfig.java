@@ -15,8 +15,6 @@ import java.nio.file.Path;
  * <p>
  * 配置项：
  * <ul>
- *   <li>limitEnabled：是否启用传送范围限制（默认 false，即不限制）</li>
- *   <li>maxDistance：启用限制时的最大传送半径（默认 1000 格）</li>
  *   <li>messageEnabled：是否在传送后发送坐标消息（默认 true）</li>
  *   <li>messageVisibility：消息可见范围，"all" 全体可见 / "admin" 仅管理员可见（默认 all）</li>
  * </ul>
@@ -25,12 +23,6 @@ public class ModConfig {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static Path configPath;
-
-    /** 是否启用传送范围限制 */
-    public boolean limitEnabled = false;
-
-    /** 启用限制时的最大传送半径（格） */
-    public double maxDistance = 1000.0;
 
     /** 是否显示 TP 坐标消息 */
     public boolean messageEnabled = true;
@@ -48,12 +40,6 @@ public class ModConfig {
             try {
                 String content = Files.readString(configPath);
                 JsonObject obj = JsonParser.parseString(content).getAsJsonObject();
-                if (obj.has("limitEnabled")) {
-                    config.limitEnabled = obj.get("limitEnabled").getAsBoolean();
-                }
-                if (obj.has("maxDistance")) {
-                    config.maxDistance = obj.get("maxDistance").getAsDouble();
-                }
                 if (obj.has("messageEnabled")) {
                     config.messageEnabled = obj.get("messageEnabled").getAsBoolean();
                 }
@@ -76,8 +62,6 @@ public class ModConfig {
     public void save() {
         try {
             JsonObject obj = new JsonObject();
-            obj.addProperty("limitEnabled", limitEnabled);
-            obj.addProperty("maxDistance", maxDistance);
             obj.addProperty("messageEnabled", messageEnabled);
             obj.addProperty("messageVisibility", messageVisibility);
             Files.writeString(configPath, GSON.toJson(obj));

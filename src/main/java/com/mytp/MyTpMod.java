@@ -25,9 +25,7 @@ public class MyTpMod implements ModInitializer {
         ModConfig config = ModConfig.load();
         TpCommand.setConfig(config);
         TpCommand.register();
-        LOGGER.info("[MyTP] 已加载：/mytp <x> <y> <z> | 范围限制={}，最大距离={}格，TP消息={}，可见范围={}",
-            config.limitEnabled ? "开启" : "关闭",
-            (long) config.maxDistance,
+        LOGGER.info("[MyTP] 已加载：/mytp <x> <y> <z> | 频率限制=1分钟10次，TP消息={}，可见范围={}",
             config.messageEnabled ? "显示" : "关闭",
             "admin".equals(config.messageVisibility) ? "管理员可见" : "全体可见");
     }
