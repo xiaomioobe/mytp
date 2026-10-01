@@ -1,14 +1,13 @@
 package com.mytp;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.players.NameAndId;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
@@ -19,7 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * MyTP 指令注册与执行。
+ * MyTP 指令注册与执行（Forge 1.20.1）。
  * <p>
  * 指令结构：
  * <pre>
@@ -50,35 +49,23 @@ public class TpCommand {
         config = cfg;
     }
 
-    /**
-     * 判断命令源是否为管理员（OP）。控制台/命令方块默认放行。
-     * 26.2 起用 PlayerList.isOp(NameAndId) 替代旧版 hasPermission(int)。
-     */
-    private static boolean isOp(CommandSourceStack source) {
-        if (!source.isPlayer()) return true;
-        ServerPlayer p = source.getPlayer();
-        return p != null && source.getServer().getPlayerList()
-                .isOp(new NameAndId(p.getGameProfile()));
-    }
-
-    public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-            dispatcher.register(Commands.literal("mytp")
-                // 传送：/mytp <x> <y> <z>
-                .then(Commands.argument("pos", Vec3Argument.vec3())
-                    .executes(TpCommand::execute))
-                // 配置：仅 OP（管理员）可用；控制台/命令方块默认放行
-                .then(Commands.literal("config")
-                    .requires(TpCommand::isOp)
-                    .executes(TpCommand::showConfig)
-                    // 消息开关 + 可见范围
-                    .then(Commands.literal("message")
-                        .then(Commands.literal("on").executes(ctx -> setMessage(ctx, true)))
-                        .then(Commands.literal("off").executes(ctx -> setMessage(ctx, false)))
-                        .then(Commands.literal("visibility")
-                            .then(Commands.literal("all").executes(ctx -> setVisibility(ctx, "all")))
-                            .then(Commands.literal("admin").executes(ctx -> setVisibility(ctx, "admin"))))))
-            ));
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        dispatcher.register(Commands.literal("mytp")
+            // 传送：/mytp <x> <y> <z>
+            .then(Commands.argument("pos", Vec3Argument.vec3())
+                .executes(TpCommand::execute))
+            // 配置：仅 OP（权限等级 2）可用
+            .then(Commands.literal("config")
+                .requires(src -> src.hasPermission(2))
+                .executes(TpCommand::showConfig)
+                // 消息开关 + 可见范围
+                .then(Commands.literal("message")
+                    .then(Commands.literal("on").executes(ctx -> setMessage(ctx, true)))
+                    .then(Commands.literal("off").executes(ctx -> setMessage(ctx, false)))
+                    .then(Commands.literal("visibility")
+                        .then(Commands.literal("all").executes(ctx -> setVisibility(ctx, "all")))
+                        .then(Commands.literal("admin").executes(ctx -> setVisibility(ctx, "admin"))))))
+        );
     }
 
     /**
@@ -129,7 +116,7 @@ public class TpCommand {
             // 仅管理员可见：遍历在线玩家，发给 OP
             List<ServerPlayer> players = server.getPlayerList().getPlayers();
             for (ServerPlayer p : players) {
-                if (server.getPlayerList().isOp(new NameAndId(p.getGameProfile()))) {
+                if (p.hasPermissions(2)) {
                     p.sendSystemMessage(component);
                 }
             }

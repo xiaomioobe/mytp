@@ -4,14 +4,14 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.fabricmc.loader.api.FabricLoader;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * MyTP 运行时配置，持久化到服务器 config 目录下的 mytp.json。
+ * MyTP 运行时配置，持久化到服务器 config 目录下的 mytp.json（Forge 1.20.1）。
  * <p>
  * 配置项：
  * <ul>
@@ -34,7 +34,7 @@ public class ModConfig {
      * 从 config/mytp.json 加载配置；文件不存在时写入默认配置。
      */
     public static ModConfig load() {
-        configPath = FabricLoader.getInstance().getConfigDir().resolve("mytp.json");
+        configPath = FMLPaths.CONFIGDIR.get().resolve("mytp.json");
         ModConfig config = new ModConfig();
         if (Files.exists(configPath)) {
             try {
